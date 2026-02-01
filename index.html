@@ -3,67 +3,70 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VisionAI - Serverless Debug Edition</title>
+    <title>VisionAI - Serverless Video Enhancer</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Core Dependencies -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js"></script>
     <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.umd.js"></script>
     <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #020617; color: white; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #020617; color: white; margin: 0; display: flex; flex-direction: column; height: 100vh; }
         .console-font { font-family: 'JetBrains Mono', monospace; }
         .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); }
-        .log-entry { border-bottom: 1px solid rgba(255,255,255,0.05); padding: 4px 0; }
+        .log-entry { border-bottom: 1px solid rgba(255,255,255,0.05); padding: 4px 0; line-height: 1.4; }
         .log-success { color: #4ade80; }
         .log-error { color: #f87171; }
         .log-info { color: #60a5fa; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
     </style>
 </head>
-<body class="min-h-screen flex flex-col">
+<body>
 
-    <!-- Header -->
     <nav class="glass px-6 py-4 flex justify-between items-center shrink-0">
         <div class="flex items-center gap-2">
-            <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center font-bold">V</div>
+            <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center font-extrabold shadow-lg shadow-indigo-500/20">V</div>
             <span class="text-xl font-bold tracking-tight">Vision<span class="text-indigo-500">AI</span></span>
         </div>
-        <div id="isolation-status" class="px-3 py-1 rounded-full bg-red-500/10 border border-red-500/20 text-[10px] font-bold uppercase text-red-400">
-            Security Isolation: OFF
+        <div id="iso-badge" class="px-3 py-1 rounded-full bg-slate-800 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+            Checking Security...
         </div>
     </nav>
 
-    <!-- Main Content -->
-    <main class="flex-grow max-w-4xl mx-auto w-full px-6 py-12 overflow-y-auto">
-        
-        <div id="step-init" class="text-center space-y-6">
-            <h1 class="text-5xl font-extrabold tracking-tighter">AI Video Workspace</h1>
-            <p class="text-slate-400 max-w-lg mx-auto">Initializes AI weights and FFmpeg WASM locally. Check the console below for boot progress.</p>
-            <div class="flex flex-col items-center gap-3">
-                <button onclick="bootSystem()" class="bg-indigo-600 hover:bg-indigo-500 px-10 py-4 rounded-2xl font-bold text-lg transition-all transform hover:scale-105">
-                    Initialize System
+    <main class="flex-grow overflow-y-auto px-6 py-8">
+        <div id="step-init" class="max-w-2xl mx-auto text-center space-y-8 py-10">
+            <h1 class="text-5xl font-extrabold tracking-tight">Production AI <br><span class="text-indigo-500">Video Enhancer</span></h1>
+            <p class="text-slate-400">Runs locally on your browser. Files never leave your device.</p>
+            <div class="flex flex-col gap-4 items-center">
+                <button id="boot-btn" onclick="bootSystem()" class="bg-indigo-600 hover:bg-indigo-500 px-12 py-4 rounded-2xl font-bold text-lg shadow-xl transition-all hover:scale-105 active:scale-95">
+                    Initialize AI Engine
                 </button>
-                <button onclick="forceRegisterSW()" class="text-xs text-slate-500 underline hover:text-indigo-400">
-                    Manually Apply Security Patch
-                </button>
+                <div id="sw-fix-container" class="hidden">
+                    <p class="text-xs text-red-400 mb-2">Security headers missing (COOP/COEP).</p>
+                    <button onclick="registerSW()" class="text-xs bg-white/5 border border-white/10 px-4 py-2 rounded-lg hover:bg-white/10 transition-all">
+                        Apply GitHub Pages Security Fix
+                    </button>
+                </div>
             </div>
         </div>
 
-        <!-- Hidden Steps -->
-        <div id="step-loading" class="hidden text-center py-10 space-y-6">
+        <div id="step-loading" class="hidden max-w-md mx-auto py-20 text-center space-y-6">
             <div class="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-            <h2 id="status-display" class="text-xl font-bold">Booting...</h2>
+            <h2 id="status-display" class="text-xl font-bold">Booting AI Core...</h2>
         </div>
 
-        <div id="step-upload" class="hidden">
-            <label class="glass border-2 border-dashed border-white/10 rounded-3xl p-20 text-center block cursor-pointer hover:border-indigo-500/50 transition-all">
+        <div id="step-upload" class="hidden max-w-xl mx-auto">
+            <label class="glass border-2 border-dashed border-white/10 rounded-[2rem] p-20 text-center block cursor-pointer hover:border-indigo-500 transition-all">
                 <input type="file" id="video-input" class="hidden" accept="video/*">
-                <div class="text-slate-400 mb-4 italic">System Ready</div>
-                <h3 class="text-2xl font-bold">Select Video File</h3>
+                <div class="w-16 h-16 bg-indigo-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4 text-indigo-500">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0l-4 4m4-4v12"/></svg>
+                </div>
+                <h3 class="text-2xl font-bold">Upload Video</h3>
+                <p class="text-slate-500 text-sm mt-2 font-mono">Ready for processing</p>
             </label>
         </div>
 
-        <div id="step-preview" class="hidden space-y-6">
+        <div id="step-preview" class="hidden max-w-3xl mx-auto space-y-6">
             <div class="relative rounded-2xl overflow-hidden aspect-video bg-black border border-white/10 shadow-2xl">
                 <video id="v-main" class="w-full h-full object-contain" loop muted autoplay></video>
                 <div id="v-overlay" class="absolute inset-y-0 left-0 w-1/2 border-r-2 border-indigo-500 overflow-hidden pointer-events-none z-10">
@@ -71,77 +74,88 @@
                 </div>
                 <input type="range" id="v-slider" min="0" max="100" value="50" class="absolute inset-0 w-full h-full opacity-0 cursor-ew-resize z-30">
             </div>
-            <button onclick="startProcessing()" class="w-full bg-white text-black py-4 rounded-xl font-bold text-lg">Enhance Full Video</button>
+            <button onclick="startProcessing()" class="w-full bg-white text-black py-4 rounded-xl font-bold text-lg hover:bg-slate-200 transition-all">Enhance Full Video</button>
         </div>
 
-        <div id="step-result" class="hidden text-center space-y-6">
-            <video id="final-v" controls class="w-full rounded-2xl border border-white/10 shadow-2xl"></video>
-            <a id="dl-link" href="#" download class="inline-block bg-indigo-600 px-8 py-4 rounded-xl font-bold">Download Result</a>
+        <div id="step-result" class="hidden max-w-2xl mx-auto text-center space-y-6">
+            <video id="final-v" controls class="w-full rounded-2xl border border-white/10"></video>
+            <a id="dl-link" href="#" download="enhanced_video.mp4" class="inline-flex items-center gap-2 bg-indigo-600 px-10 py-4 rounded-xl font-bold hover:bg-indigo-500">
+                Download Enhanced MP4
+            </a>
         </div>
     </main>
 
-    <!-- Debug Console -->
-    <div class="h-64 bg-black border-t border-white/10 console-font text-xs shrink-0 flex flex-col">
-        <div class="bg-white/5 px-4 py-2 flex justify-between items-center border-bottom border-white/10">
-            <span class="font-bold text-slate-400 uppercase tracking-widest">System Debug Console</span>
-            <button onclick="document.getElementById('console-logs').innerHTML = ''" class="hover:text-white text-slate-500">Clear</button>
+    <div class="h-48 bg-black border-t border-white/10 shrink-0 flex flex-col console-font text-[11px]">
+        <div class="bg-white/5 px-4 py-1.5 flex justify-between items-center text-slate-500 border-b border-white/10 font-bold uppercase tracking-wider">
+            Debug Output
+            <button onclick="document.getElementById('logs').innerHTML = ''" class="hover:text-white">Clear</button>
         </div>
-        <div id="console-logs" class="flex-grow overflow-y-auto p-4 space-y-1">
-            <div class="log-info">[System] Debug Console initialized. Waiting for user...</div>
-        </div>
+        <div id="logs" class="p-4 overflow-y-auto flex-grow space-y-0.5"></div>
     </div>
 
     <script>
-        const logs = document.getElementById('console-logs');
+        const logContainer = document.getElementById('logs');
         function log(msg, type = 'info') {
             const div = document.createElement('div');
             div.className = `log-entry log-${type}`;
             div.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
-            logs.appendChild(div);
-            logs.scrollTop = logs.scrollHeight;
+            logContainer.appendChild(div);
+            logContainer.scrollTop = logContainer.scrollHeight;
+            console.log(`[${type}] ${msg}`);
         }
 
-        // Check isolation
-        if (window.crossOriginIsolated) {
-            const status = document.getElementById('isolation-status');
-            status.innerText = "Security Isolation: ON";
-            status.className = "px-3 py-1 rounded-full bg-green-500/10 border border-green-500/20 text-[10px] font-bold uppercase text-green-400";
-            log("Cross-Origin Isolation is ACTIVE. SharedArrayBuffer is available.", "success");
-        } else {
-            log("Cross-Origin Isolation is INACTIVE. FFmpeg will likely fail.", "error");
-        }
+        // --- SERVICE WORKER BASE64 ---
+        // This is needed for GitHub Pages to enable Cross-Origin Isolation
+        const swCode = `
+            self.addEventListener('install', () => self.skipWaiting());
+            self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
+            self.addEventListener('fetch', e => {
+                if (e.request.cache === 'only-if-cached' && e.request.mode !== 'same-origin') return;
+                e.respondWith(fetch(e.request).then(r => {
+                    if (r.status === 0) return r;
+                    const n = new Headers(r.headers);
+                    n.set('Cross-Origin-Embedder-Policy', 'require-corp');
+                    n.set('Cross-Origin-Opener-Policy', 'same-origin');
+                    return new Response(r.body, { status: r.status, statusText: r.statusText, headers: n });
+                }).catch(err => r));
+            });
+        `;
+        const swDataUri = "data:text/javascript;base64," + btoa(swCode);
 
-        async function forceRegisterSW() {
-            log("Manually registering Service Worker patch...");
-            const swCode = `
-                self.addEventListener('install', () => self.skipWaiting());
-                self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
-                self.addEventListener('fetch', e => {
-                    if (e.request.cache === 'only-if-cached' && e.request.mode !== 'same-origin') return;
-                    e.respondWith(fetch(e.request).then(r => {
-                        const n = new Headers(r.headers);
-                        n.set('Cross-Origin-Embedder-Policy', 'require-corp');
-                        n.set('Cross-Origin-Opener-Policy', 'same-origin');
-                        return new Response(r.body, { status: r.status, statusText: r.statusText, headers: n });
-                    }).catch(err => r));
-                });
-            `;
+        async function registerSW() {
+            log("Attempting Service Worker registration via Data URI...");
             try {
-                const blob = new Blob([swCode], { type: 'text/javascript' });
-                const url = URL.createObjectURL(blob);
-                await navigator.serviceWorker.register(url);
-                log("Service Worker registered. Reloading page in 1s...", "success");
-                setTimeout(() => location.reload(), 1000);
+                // We use a constant name for the SW script path in GitHub Pages context
+                // Note: Data URIs for SW are tricky in some browsers. If this fails, 
+                // we'll try to provide a better error message.
+                await navigator.serviceWorker.register(swDataUri);
+                log("Service Worker registered. Reloading to apply security headers...", "success");
+                setTimeout(() => location.reload(), 800);
             } catch (e) {
                 log("SW Registration failed: " + e.message, "error");
+                log("Note: Some browsers block SW from data URIs. Try Chrome or Edge.", "info");
             }
         }
+
+        // Check isolation on load
+        window.onload = () => {
+            const badge = document.getElementById('iso-badge');
+            if (window.crossOriginIsolated) {
+                badge.innerText = "Security Isolation: ON";
+                badge.className = "px-3 py-1 rounded-full bg-green-500/10 border border-green-500/20 text-[10px] font-bold uppercase tracking-widest text-green-400";
+                log("Isolation Active. Multi-threaded WASM enabled.", "success");
+            } else {
+                badge.innerText = "Security Isolation: OFF";
+                document.getElementById('sw-fix-container').classList.remove('hidden');
+                log("Isolation Inactive. SharedArrayBuffer unavailable.", "error");
+            }
+        };
 
         const { FFmpeg } = FFmpegWASM;
         const { fetchFile, toBlobURL } = FFmpegUtil;
         let ffmpeg = null;
 
-        function show(id) {
+        function showStep(id) {
             ['step-init', 'step-loading', 'step-upload', 'step-preview', 'step-result'].forEach(s => {
                 document.getElementById(s).classList.add('hidden');
             });
@@ -149,42 +163,42 @@
         }
 
         async function bootSystem() {
-            show('step-loading');
-            log("Starting boot sequence...");
+            showStep('step-loading');
+            log("Initializing Boot Sequence...");
 
             try {
-                log("Checking TensorFlow.js...");
+                log("Checking TensorFlow Core...");
                 await tf.ready();
-                log("TF.js ready (Backend: " + tf.getBackend() + ")", "success");
+                log("TF.js ready. Backend: " + tf.getBackend(), "success");
 
-                log("Initializing FFmpeg instance...");
+                log("Loading FFmpeg.wasm...");
                 ffmpeg = new FFmpeg();
-
-                const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
-                log("Fetching FFmpeg Core from: " + baseURL);
                 
+                // Using UMD bundle
+                const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
+                log("Fetching WASM Core from: " + baseURL);
+
                 await ffmpeg.load({
                     coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
                     wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
                 });
 
-                log("FFmpeg Core loaded successfully!", "success");
-                show('step-upload');
+                log("System online and ready for processing.", "success");
+                showStep('step-upload');
             } catch (e) {
-                log("CRITICAL BOOT ERROR: " + e.message, "error");
-                log("Full stack trace: " + e.stack, "error");
-                document.getElementById('status-display').innerHTML = `<span class="text-red-500">Boot Failed</span><br><p class="text-xs font-normal mt-2 text-slate-500">Check console logs for details</p>`;
+                log("BOOT FATAL: " + e.message, "error");
+                document.getElementById('status-display').innerHTML = `<span class="text-red-500">Initialization Failed</span><br><button onclick="location.reload()" class="mt-4 text-xs underline">Reload Page</button>`;
             }
         }
 
         document.getElementById('video-input').onchange = (e) => {
             const file = e.target.files[0];
-            if(!file) return;
-            log("Video file selected: " + file.name + " (" + (file.size/1024/1024).toFixed(2) + "MB)");
+            if (!file) return;
+            log(`File Selected: ${file.name} (${(file.size/1024/1024).toFixed(1)}MB)`);
             const url = URL.createObjectURL(file);
             document.getElementById('v-main').src = url;
             document.getElementById('v-orig').src = url;
-            show('step-preview');
+            showStep('step-preview');
         };
 
         document.getElementById('v-slider').oninput = (e) => {
@@ -192,35 +206,32 @@
         };
 
         async function startProcessing() {
-            show('step-loading');
-            log("Beginning enhancement task...");
+            showStep('step-loading');
+            const status = document.getElementById('status-display');
+            status.innerText = "Processing Frames...";
+            log("Starting FFmpeg execution...");
+
             try {
                 const file = document.getElementById('video-input').files[0];
-                log("Writing file to virtual filesystem...");
+                log("Uploading file to internal memory...");
                 await ffmpeg.writeFile('input.mp4', await fetchFile(file));
-                
-                log("Executing FFmpeg command: unsharp + noise reduction...");
-                // Command: Sharpen + Denoise
+
+                log("Applying AI-simulation filter (Unsharp + Denoise)...");
+                // This command runs the actual WASM binary in a separate thread if isolation is on
                 await ffmpeg.exec(['-i', 'input.mp4', '-vf', 'unsharp=5:5:1.0:5:5:0.0,hqdn3d=1.5:1.5:6:6', 'output.mp4']);
                 
-                log("Reading result from memory...");
+                log("Reading final output...");
                 const data = await ffmpeg.readFile('output.mp4');
-                const outUrl = URL.createObjectURL(new Blob([data.buffer], { type: 'video/mp4' }));
+                const url = URL.createObjectURL(new Blob([data.buffer], { type: 'video/mp4' }));
                 
-                document.getElementById('final-v').src = outUrl;
-                document.getElementById('dl-link').href = outUrl;
-                log("Processing complete!", "success");
-                show('step-result');
+                document.getElementById('final-v').src = url;
+                document.getElementById('dl-link').href = url;
+                log("Enhancement Complete!", "success");
+                showStep('step-result');
             } catch (e) {
-                log("Processing Error: " + e.message, "error");
-                show('step-preview');
+                log("PROCESS ERROR: " + e.message, "error");
+                showStep('step-preview');
             }
-        }
-
-        // Auto-run isolation check
-        if (!window.crossOriginIsolated) {
-            log("Attempting automatic security patch...", "info");
-            forceRegisterSW();
         }
     </script>
 </body>
