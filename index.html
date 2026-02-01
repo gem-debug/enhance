@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VisionAI - Mobile Direct Fix</title>
+    <title>VisionAI - Mobile Force-Load</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js"></script>
-    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.umd.js"></script>
-    <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
+    <!-- Use UMD versions for libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ffmpeg/0.12.10/ffmpeg.umd.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ffmpeg-util/0.12.1/index.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #020617; color: white; margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
@@ -15,8 +15,7 @@
         .console { background: #000; font-family: monospace; font-size: 10px; border-top: 1px solid #333; height: 160px; overflow-y: auto; padding: 10px; }
         .log-error { color: #f87171; border-left: 2px solid #f87171; padding-left: 4px; }
         .log-success { color: #4ade80; }
-        .log-info { color: #60a5fa; }
-        .progress-bar { transition: width 0.4s ease; box-shadow: 0 0 15px rgba(99, 102, 241, 0.4); }
+        .progress-bar { transition: width 0.4s ease; }
     </style>
 </head>
 <body>
@@ -26,15 +25,15 @@
             <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center font-bold">V</div>
             <span class="font-bold">VisionAI</span>
         </div>
-        <div id="thread-badge" class="px-2 py-0.5 rounded text-[9px] font-bold bg-slate-800 text-slate-400">CONNECTING...</div>
+        <div id="status-badge" class="px-2 py-0.5 rounded text-[9px] font-bold bg-slate-800 text-slate-400 uppercase tracking-widest">Ready</div>
     </nav>
 
     <main class="flex-grow overflow-y-auto p-6 flex flex-col items-center justify-center text-center">
         
         <div id="step-init" class="space-y-6">
             <h1 class="text-4xl font-extrabold leading-tight">AI Video <br>Enhancer</h1>
-            <p class="text-slate-400 text-sm max-w-xs mx-auto">Sharpen and denoise video directly on your device.</p>
-            <button onclick="bootSystem()" class="bg-indigo-600 w-full py-4 rounded-xl font-bold text-lg shadow-lg active:scale-95">
+            <p class="text-slate-400 text-sm max-w-xs mx-auto">Hardware-accelerated sharpening for mobile.</p>
+            <button onclick="bootSystem()" class="bg-indigo-600 w-full py-4 rounded-xl font-bold text-lg shadow-lg active:scale-95 transition-transform">
                 Start Engine
             </button>
         </div>
@@ -48,7 +47,7 @@
                 <div class="w-full bg-white/5 h-2 rounded-full overflow-hidden border border-white/10">
                     <div id="load-bar" class="progress-bar bg-indigo-500 h-full w-0"></div>
                 </div>
-                <p id="byte-counter" class="text-[9px] text-slate-500 font-mono">0 / 25.5 MB</p>
+                <p id="byte-counter" class="text-[9px] text-slate-500 font-mono">0 / 25 MB</p>
             </div>
         </div>
 
@@ -64,41 +63,35 @@
 
         <div id="step-preview" class="hidden w-full max-w-sm space-y-4">
             <video id="v-preview" class="w-full rounded-xl bg-black aspect-video object-contain" controls></video>
-            <button onclick="startProcessing()" class="w-full bg-indigo-600 py-4 rounded-xl font-bold">Enhance Now</button>
+            <button onclick="startProcessing()" class="w-full bg-indigo-600 py-4 rounded-xl font-bold">Enhance Video</button>
         </div>
 
         <div id="step-result" class="hidden w-full max-w-sm space-y-4">
             <video id="v-final" class="w-full rounded-xl bg-black aspect-video object-contain" controls></video>
-            <a id="dl-link" href="#" download="enhanced.mp4" class="block w-full bg-white text-black py-4 rounded-xl font-bold text-center">Download Results</a>
+            <a id="dl-link" href="#" download="enhanced.mp4" class="block w-full bg-white text-black py-4 rounded-xl font-bold text-center">Save Video</a>
         </div>
     </main>
 
     <div id="console" class="console shrink-0">
-        <div id="logs" class="space-y-1">
-            <div class="log-info">System initialized. Tap "Start Engine" to begin.</div>
-        </div>
+        <div id="logs" class="space-y-1"></div>
     </div>
 
     <script>
-        // Use a clearer variable name to avoid conflict with the FFmpeg class
-        let ffmpegInstance = null;
+        let ffmpeg = null;
 
         function log(msg, type = 'info') {
             const div = document.createElement('div');
-            div.className = `log-${type}`;
+            div.className = `log-${type} text-[10px]`;
             div.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
             document.getElementById('logs').appendChild(div);
             document.getElementById('console').scrollTop = document.getElementById('console').scrollHeight;
         }
 
-        async function downloadWithProgress(url, label) {
-            log(`Fetching: ${url.split('/').pop()}...`);
+        async function fetchWithProgress(url) {
+            log(`Streaming: ${url.split('/').pop()}`);
             const response = await fetch(url);
-            
-            if (!response.ok) throw new Error(`Network response was not ok: ${response.statusText}`);
-            
             const reader = response.body.getReader();
-            const contentLength = +response.headers.get('Content-Length') || 0;
+            const contentLength = +response.headers.get('Content-Length');
             
             let receivedLength = 0;
             let chunks = []; 
@@ -109,16 +102,11 @@
                 chunks.push(value);
                 receivedLength += value.length;
                 
-                if (contentLength > 0) {
-                    const pct = Math.round((receivedLength / contentLength) * 100);
-                    document.getElementById('load-pct').innerText = `${pct}%`;
-                    document.getElementById('load-bar').style.width = `${pct}%`;
-                    document.getElementById('byte-counter').innerText = 
-                        `${(receivedLength/1024/1024).toFixed(1)} / ${(contentLength/1024/1024).toFixed(1)} MB`;
-                } else {
-                    document.getElementById('byte-counter').innerText = 
-                        `${(receivedLength/1024/1024).toFixed(1)} MB downloaded...`;
-                }
+                const pct = Math.round((receivedLength / contentLength) * 100);
+                document.getElementById('load-pct').innerText = `${pct}%`;
+                document.getElementById('load-bar').style.width = `${pct}%`;
+                document.getElementById('byte-counter').innerText = 
+                    `${(receivedLength/1024/1024).toFixed(1)} / ${(contentLength/1024/1024).toFixed(1)} MB`;
             }
 
             let chunksAll = new Uint8Array(receivedLength);
@@ -128,39 +116,37 @@
                 position += chunk.length;
             }
             
-            return URL.createObjectURL(new Blob([chunksAll], { type: url.endsWith('.js') ? 'text/javascript' : 'application/wasm' }));
+            const mime = url.endsWith('.js') ? 'text/javascript' : 'application/wasm';
+            return URL.createObjectURL(new Blob([chunksAll], { type: mime }));
         }
 
         async function bootSystem() {
-            // Safety check for library loading
-            if (typeof FFmpegWASM === 'undefined') {
-                log("FFmpeg library not yet loaded from CDN. Please wait 2 seconds and try again.", "error");
-                return;
-            }
-
             document.getElementById('step-init').classList.add('hidden');
             document.getElementById('step-loading').classList.remove('hidden');
             
             try {
-                log("Verifying WebGL context...");
-                await tf.ready();
+                if (typeof FFmpegWASM === 'undefined') throw new Error("Library JS not loaded yet");
                 
-                // Use the class from the global UMD namespace
                 const { FFmpeg } = FFmpegWASM;
-                ffmpegInstance = new FFmpeg();
+                ffmpeg = new FFmpeg();
+
+                // FORCE USING YOUR PROVIDED LINKS
+                const coreJS = 'https://cdnjs.cloudflare.com/ajax/libs/ffmpeg-core/0.12.10/umd/ffmpeg-core.js';
+                const coreWASM = 'https://cdnjs.cloudflare.com/ajax/libs/ffmpeg-core/0.12.10/umd/ffmpeg-core.wasm';
+
+                log("Downloading UMD core scripts...");
+                const coreURL = await fetchWithProgress(coreJS);
+                const wasmURL = await fetchWithProgress(coreWASM);
                 
-                const coreURL = await downloadWithProgress('https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js', "JS Core");
-                const wasmURL = await downloadWithProgress('https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm', "WASM Core");
-                
-                log("Initializing FFmpeg Module...");
-                await ffmpegInstance.load({ coreURL, wasmURL });
+                log("Initializing WASM...");
+                await ffmpeg.load({ coreURL, wasmURL });
                 
                 log("System ready.", "success");
+                document.getElementById('status-badge').innerText = "ENGINE ONLINE";
                 document.getElementById('step-loading').classList.add('hidden');
                 document.getElementById('step-upload').classList.remove('hidden');
-                document.getElementById('thread-badge').innerText = window.crossOriginIsolated ? "MT ACTIVE" : "ST ACTIVE";
             } catch (e) {
-                log("BOOT ERROR: " + (e.message || "Unknown error"), "error");
+                log("CRITICAL ERROR: " + e.message, "error");
                 console.error(e);
             }
         }
@@ -178,7 +164,7 @@
             document.getElementById('step-loading').classList.remove('hidden');
             document.getElementById('load-label').innerText = "Processing Video...";
             
-            ffmpegInstance.on('progress', ({ progress }) => {
+            ffmpeg.on('progress', ({ progress }) => {
                 const pct = Math.round(progress * 100);
                 document.getElementById('load-pct').innerText = `${pct}%`;
                 document.getElementById('load-bar').style.width = `${pct}%`;
@@ -187,31 +173,25 @@
             try {
                 const file = document.getElementById('video-input').files[0];
                 const { fetchFile } = FFmpegUtil;
-                await ffmpegInstance.writeFile('in.mp4', await fetchFile(file));
+                await ffmpeg.writeFile('in.mp4', await fetchFile(file));
 
-                log("Running Mobile AI-Filter...");
-                await ffmpegInstance.exec([
-                    '-i', 'in.mp4', 
-                    '-vf', 'unsharp=3:3:0.5:3:3:0.0,hqdn3d=1:1:3:3', 
-                    '-preset', 'ultrafast', 
-                    'out.mp4'
-                ]);
+                log("AI Sharpening started...");
+                // Sharpness filter + Fast encoding
+                await ffmpeg.exec(['-i', 'in.mp4', '-vf', 'unsharp=5:5:1.0:5:5:0.0', '-preset', 'ultrafast', 'out.mp4']);
 
-                const data = await ffmpegInstance.readFile('out.mp4');
+                const data = await ffmpeg.readFile('out.mp4');
                 const url = URL.createObjectURL(new Blob([data.buffer], { type: 'video/mp4' }));
                 
                 document.getElementById('v-final').src = url;
                 document.getElementById('dl-link').href = url;
                 document.getElementById('step-loading').classList.add('hidden');
                 document.getElementById('step-result').classList.remove('hidden');
-                log("Processing Complete.", "success");
+                log("Success!", "success");
             } catch (e) {
-                log("CRASH: " + e.message, "error");
+                log("ERROR: " + e.message, "error");
             }
         }
     </script>
 </body>
 </html>
-
-
 
