@@ -16,6 +16,14 @@
         .log-error { color: #f87171; border-left: 2px solid #f87171; padding-left: 4px; }
         .log-success { color: #4ade80; }
         .progress-bar { transition: width 0.4s ease; }
+        
+        .btn-disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(1); }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .spinner { animation: spin 1s linear infinite; }
     </style>
 </head>
 <body>
@@ -25,7 +33,7 @@
             <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center font-bold">V</div>
             <span class="font-bold">VisionAI</span>
         </div>
-        <div id="status-badge" class="px-2 py-0.5 rounded text-[9px] font-bold bg-slate-800 text-slate-400 uppercase tracking-widest">Ready</div>
+        <div id="status-badge" class="px-2 py-0.5 rounded text-[9px] font-bold bg-slate-800 text-slate-400 uppercase tracking-widest">Connecting...</div>
     </nav>
 
     <main class="flex-grow overflow-y-auto p-6 flex flex-col items-center justify-center text-center">
@@ -33,9 +41,17 @@
         <div id="step-init" class="space-y-6">
             <h1 class="text-4xl font-extrabold leading-tight">AI Video <br>Enhancer</h1>
             <p class="text-slate-400 text-sm max-w-xs mx-auto">Hardware-accelerated sharpening for mobile.</p>
-            <button onclick="bootSystem()" class="bg-indigo-600 w-full py-4 rounded-xl font-bold text-lg shadow-lg active:scale-95 transition-transform">
-                Start Engine
-            </button>
+            
+            <div class="space-y-3">
+                <button id="boot-btn" disabled onclick="bootSystem()" class="btn-disabled bg-indigo-600 w-full py-4 rounded-xl font-bold text-lg shadow-lg active:scale-95 transition-all flex items-center justify-center gap-3">
+                    <svg id="boot-spinner" class="spinner w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span id="boot-btn-text">Waiting for CDN...</span>
+                </button>
+                <p id="boot-subtext" class="text-[10px] text-slate-500">Establishing secure connection to Cloudflare...</p>
+            </div>
         </div>
 
         <div id="step-loading" class="hidden w-full max-w-sm space-y-6">
@@ -87,6 +103,35 @@
             document.getElementById('console').scrollTop = document.getElementById('console').scrollHeight;
         }
 
+        // New Library Watcher Logic
+        function checkLibraryAvailability() {
+            const btn = document.getElementById('boot-btn');
+            const btnText = document.getElementById('boot-btn-text');
+            const spinner = document.getElementById('boot-spinner');
+            const subtext = document.getElementById('boot-subtext');
+            const badge = document.getElementById('status-badge');
+
+            if (typeof FFmpegWASM !== 'undefined') {
+                btn.disabled = false;
+                btn.classList.remove('btn-disabled');
+                btnText.innerText = "Start Engine";
+                spinner.classList.add('hidden');
+                subtext.innerText = "Engine components verified.";
+                badge.innerText = "Ready";
+                badge.classList.replace('text-slate-400', 'text-green-400');
+                log("CDN Core Libraries detected.");
+            } else {
+                // Keep checking every 500ms
+                setTimeout(checkLibraryAvailability, 500);
+            }
+        }
+
+        // Run immediately on page load
+        window.onload = () => {
+            log("System standby. Monitoring CDN connection...");
+            checkLibraryAvailability();
+        };
+
         async function fetchWithProgress(url) {
             log(`Streaming: ${url.split('/').pop()}`);
             const response = await fetch(url);
@@ -125,12 +170,9 @@
             document.getElementById('step-loading').classList.remove('hidden');
             
             try {
-                if (typeof FFmpegWASM === 'undefined') throw new Error("Library JS not loaded yet");
-                
                 const { FFmpeg } = FFmpegWASM;
                 ffmpeg = new FFmpeg();
 
-                // FORCE USING YOUR PROVIDED LINKS
                 const coreJS = 'https://cdnjs.cloudflare.com/ajax/libs/ffmpeg-core/0.12.10/umd/ffmpeg-core.js';
                 const coreWASM = 'https://cdnjs.cloudflare.com/ajax/libs/ffmpeg-core/0.12.10/umd/ffmpeg-core.wasm';
 
@@ -176,7 +218,6 @@
                 await ffmpeg.writeFile('in.mp4', await fetchFile(file));
 
                 log("AI Sharpening started...");
-                // Sharpness filter + Fast encoding
                 await ffmpeg.exec(['-i', 'in.mp4', '-vf', 'unsharp=5:5:1.0:5:5:0.0', '-preset', 'ultrafast', 'out.mp4']);
 
                 const data = await ffmpeg.readFile('out.mp4');
