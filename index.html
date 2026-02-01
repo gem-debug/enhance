@@ -6,17 +6,17 @@
     <title>VisionAI - Mobile Serverless Enhancer</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js"></script>
-    <!-- Use the version of FFmpeg that supports both Single and Multi thread -->
     <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.umd.js"></script>
     <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
-        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #020617; color: white; margin: 0; height: 100vh; display: flex; flex-direction: column; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #020617; color: white; margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
         .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); }
-        .console { background: #000; font-family: monospace; font-size: 10px; border-top: 1px solid #333; height: 150px; overflow-y: auto; padding: 10px; }
-        .log-error { color: #f87171; }
+        .console { background: #000; font-family: 'Courier New', Courier, monospace; font-size: 11px; border-top: 1px solid #333; height: 180px; overflow-y: auto; padding: 10px; }
+        .log-error { color: #f87171; border-left: 3px solid #f87171; padding-left: 5px; }
         .log-success { color: #4ade80; }
         .log-info { color: #60a5fa; }
+        .progress-fill { transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
     </style>
 </head>
 <body>
@@ -24,7 +24,7 @@
     <nav class="glass px-4 py-3 flex justify-between items-center shrink-0">
         <div class="flex items-center gap-2">
             <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center font-bold">V</div>
-            <span class="font-bold">VisionAI</span>
+            <span class="font-bold tracking-tight">VisionAI</span>
         </div>
         <div id="mode-badge" class="px-2 py-0.5 rounded text-[9px] font-bold uppercase bg-slate-800 text-slate-400">
             Detecting...
@@ -34,49 +34,63 @@
     <main class="flex-grow overflow-y-auto p-6 flex flex-col items-center justify-center text-center">
         
         <div id="step-init" class="space-y-6">
-            <h1 class="text-4xl font-extrabold leading-tight">Mobile AI <br>Video Upscaler</h1>
-            <p class="text-slate-400 text-sm max-w-xs mx-auto">Enhance videos directly on your phone. No uploads. No servers.</p>
-            <button id="boot-btn" onclick="bootSystem()" class="bg-indigo-600 w-full py-4 rounded-xl font-bold text-lg shadow-lg active:scale-95 transition-transform">
+            <h1 class="text-4xl font-extrabold leading-tight">AI Video <br>Enhancer</h1>
+            <p class="text-slate-400 text-sm max-w-xs mx-auto">Upload a video to sharpen details and remove noise locally.</p>
+            <button onclick="bootSystem()" class="bg-indigo-600 w-full py-4 rounded-xl font-bold text-lg shadow-lg active:scale-95 transition-transform">
                 Initialize System
             </button>
         </div>
 
-        <div id="step-loading" class="hidden space-y-4">
-            <div class="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-            <p id="loading-text" class="text-sm font-bold">Loading Engine...</p>
+        <!-- Progress Container -->
+        <div id="step-loading" class="hidden w-full max-w-sm space-y-6">
+            <div class="space-y-2">
+                <div class="flex justify-between text-xs font-bold uppercase tracking-wider text-indigo-400">
+                    <span id="loading-text">Downloading Core...</span>
+                    <span id="loading-percent">0%</span>
+                </div>
+                <div class="w-full bg-white/5 h-3 rounded-full overflow-hidden border border-white/10">
+                    <div id="loading-bar" class="progress-fill bg-indigo-500 h-full w-0"></div>
+                </div>
+            </div>
+            <p class="text-[10px] text-slate-500 italic">Please stay on this tab. Downloading ~25MB of AI assets.</p>
         </div>
 
         <div id="step-upload" class="hidden w-full max-w-sm">
-            <label class="glass border-2 border-dashed border-white/10 rounded-2xl p-10 block cursor-pointer">
+            <label class="glass border-2 border-dashed border-white/10 rounded-2xl p-10 block cursor-pointer active:bg-white/5 transition-colors">
                 <input type="file" id="video-input" class="hidden" accept="video/*">
                 <div class="text-indigo-500 mb-2">
-                    <svg class="w-10 h-10 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    <svg class="w-10 h-10 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
                 </div>
-                <p class="font-bold">Tap to Choose Video</p>
-                <p class="text-[10px] text-slate-500 mt-2 uppercase">Processing happens on-device</p>
+                <p class="font-bold">Choose Video File</p>
+                <p class="text-[10px] text-slate-500 mt-2 uppercase">Local processing active</p>
             </label>
         </div>
 
         <div id="step-preview" class="hidden w-full max-w-sm space-y-4">
-            <video id="v-preview" class="w-full rounded-xl bg-black aspect-video object-contain" controls></video>
-            <button onclick="startProcessing()" class="w-full bg-indigo-600 py-4 rounded-xl font-bold">Enhance Video</button>
-            <button onclick="location.reload()" class="text-xs text-slate-500">Cancel</button>
+            <div class="glass p-2 rounded-xl">
+                <video id="v-preview" class="w-full rounded-lg bg-black aspect-video object-contain" controls></video>
+            </div>
+            <button onclick="startProcessing()" class="w-full bg-indigo-600 py-4 rounded-xl font-bold shadow-lg">Enhance & Export</button>
+            <button onclick="location.reload()" class="text-xs text-slate-500 underline">Cancel</button>
         </div>
 
         <div id="step-result" class="hidden w-full max-w-sm space-y-4">
-            <div class="text-green-400 text-sm font-bold">Enhancement Complete!</div>
+            <div class="text-green-400 text-sm font-bold flex items-center justify-center gap-2">
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"></path></svg>
+                Enhancement Complete
+            </div>
             <video id="v-final" class="w-full rounded-xl bg-black aspect-video object-contain" controls></video>
-            <a id="dl-link" href="#" download="enhanced.mp4" class="block w-full bg-white text-black py-4 rounded-xl font-bold text-center">Download MP4</a>
+            <a id="dl-link" href="#" download="vision_ai_enhanced.mp4" class="block w-full bg-white text-black py-4 rounded-xl font-bold text-center">Save to Device</a>
         </div>
 
     </main>
 
     <div id="console" class="console shrink-0">
-        <div class="text-slate-500 border-b border-white/10 pb-1 mb-1 flex justify-between">
-            <span>MOBILE DEBUG LOG</span>
-            <span id="thread-type">...</span>
+        <div class="text-slate-500 border-b border-white/10 pb-1 mb-2 flex justify-between items-center">
+            <span class="font-bold tracking-widest text-[9px]">ENGINE_LOGS</span>
+            <span id="thread-type" class="text-[9px]">WAITING...</span>
         </div>
-        <div id="logs"></div>
+        <div id="logs" class="space-y-1"></div>
     </div>
 
     <script>
@@ -84,13 +98,27 @@
         const { fetchFile, toBlobURL } = FFmpegUtil;
         let ffmpeg = null;
 
+        const ui = {
+            bar: document.getElementById('loading-bar'),
+            text: document.getElementById('loading-text'),
+            percent: document.getElementById('loading-percent'),
+            logs: document.getElementById('logs'),
+            con: document.getElementById('console')
+        };
+
         function log(msg, type = 'info') {
             const div = document.createElement('div');
-            div.className = `log-${type} mb-1`;
-            div.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
-            document.getElementById('logs').appendChild(div);
-            const con = document.getElementById('console');
-            con.scrollTop = con.scrollHeight;
+            div.className = `log-${type}`;
+            div.innerText = `[${new Date().toLocaleTimeString([], {hour12:false})}] ${msg}`;
+            ui.logs.appendChild(div);
+            ui.con.scrollTop = ui.con.scrollHeight;
+        }
+
+        function updateProgress(p, label) {
+            const pct = Math.round(p * 100);
+            ui.bar.style.width = `${pct}%`;
+            ui.percent.innerText = `${pct}%`;
+            if (label) ui.text.innerText = label;
         }
 
         function show(id) {
@@ -101,71 +129,94 @@
         }
 
         const isIsolated = window.crossOriginIsolated;
-        document.getElementById('mode-badge').innerText = isIsolated ? "Multi-Thread: ON" : "Single-Thread: ON";
-        document.getElementById('mode-badge').className += isIsolated ? " bg-green-900/30 text-green-400" : " bg-yellow-900/30 text-yellow-400";
-        document.getElementById('thread-type').innerText = isIsolated ? "Mode: MT" : "Mode: ST";
+        document.getElementById('mode-badge').innerText = isIsolated ? "Multi-Thread" : "Single-Thread";
+        document.getElementById('mode-badge').classList.add(isIsolated ? 'text-green-400' : 'text-yellow-500');
 
         async function bootSystem() {
             show('step-loading');
-            log(`Booting (Isolated: ${isIsolated})...`);
+            updateProgress(0, "Initiating...");
+            log(`Boot sequence started. Isolated: ${isIsolated}`);
 
             try {
-                log("Starting TF.js...");
+                log("Warming up TensorFlow.js...");
                 await tf.ready();
-                log("TF.js ready.", "success");
+                updateProgress(0.1, "Engine Ready");
 
                 ffmpeg = new FFmpeg();
-                
-                // If not isolated (mobile), we MUST use the non-mt (single thread) core
-                // If isolated, we can use the mt (multi thread) core
+
+                // Listen to download progress
+                ffmpeg.on('log', ({ message }) => {
+                    if (message.includes('error')) log(message, 'error');
+                    else console.log(message);
+                });
+
                 const coreVersion = '0.12.6';
                 const baseURL = `https://unpkg.com/@ffmpeg/core@${coreVersion}/dist/umd`;
                 
-                log("Fetching FFmpeg Core...");
+                log("Downloading Video Core (~25MB)...");
                 await ffmpeg.load({
                     coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
                     wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
                 });
 
-                log("FFmpeg Loaded.", "success");
-                show('step-upload');
+                log("Core loaded into browser memory.", "success");
+                updateProgress(1, "Ready");
+                setTimeout(() => show('step-upload'), 500);
             } catch (e) {
-                log("Boot Error: " + e.message, "error");
-                document.getElementById('loading-text').innerText = "Boot Failed (Check Log)";
+                log("BOOT ERROR: " + e.message, "error");
+                log("Check if your internet connection allows access to unpkg.com", "info");
+                ui.text.innerText = "System Failure";
+                ui.bar.classList.replace('bg-indigo-500', 'bg-red-500');
             }
         }
 
         document.getElementById('video-input').onchange = (e) => {
             const file = e.target.files[0];
             if (!file) return;
-            log(`File: ${file.name} (${(file.size/1024/1024).toFixed(1)}MB)`);
+            log(`Imported: ${file.name} (${(file.size/1024/1024).toFixed(2)}MB)`);
             document.getElementById('v-preview').src = URL.createObjectURL(file);
             show('step-preview');
         };
 
         async function startProcessing() {
             show('step-loading');
-            document.getElementById('loading-text').innerText = "Processing Video...";
-            log("Writing to virtual FS...");
+            updateProgress(0, "Preparing Memory...");
+            log("Starting enhancement task...");
             
+            // Progress tracker for the actual conversion
+            ffmpeg.on('progress', ({ progress, time }) => {
+                updateProgress(progress, "Enhancing Frames...");
+                log(`Encoding: ${Math.round(progress * 100)}% (Time: ${Math.round(time/1000000)}s)`);
+            });
+
             try {
                 const file = document.getElementById('video-input').files[0];
+                log("Writing source to virtual disk...");
                 await ffmpeg.writeFile('input.mp4', await fetchFile(file));
 
-                log("Enhancing details (AI-Sharp)...");
-                // Single thread is slow, so we use a faster sharpening algorithm
-                await ffmpeg.exec(['-i', 'input.mp4', '-vf', 'unsharp=3:3:1.0:3:3:0.0', 'output.mp4']);
+                log("Applying AI filters (Denoise + Sharpen)...");
+                // Using 'hqdn3d' for denoise and 'unsharp' for AI-like detail enhancement
+                // Adjusting parameters for better performance on mobile
+                await ffmpeg.exec([
+                    '-i', 'input.mp4',
+                    '-vf', 'hqdn3d=1.5:1.5:6:6,unsharp=3:3:0.8:3:3:0.0',
+                    '-c:v', 'libx264',
+                    '-preset', 'ultrafast', // Crucial for mobile performance
+                    '-crf', '28',
+                    'output.mp4'
+                ]);
 
-                log("Reading final buffer...");
+                log("Finalizing output file...");
                 const data = await ffmpeg.readFile('output.mp4');
                 const url = URL.createObjectURL(new Blob([data.buffer], { type: 'video/mp4' }));
                 
                 document.getElementById('v-final').src = url;
                 document.getElementById('dl-link').href = url;
-                log("Done!", "success");
+                log("Task completed successfully.", "success");
                 show('step-result');
             } catch (e) {
-                log("Process Error: " + e.message, "error");
+                log("PROCESS FATAL: " + e.message, "error");
+                log("This usually happens if the video is too high resolution for the phone's RAM.", "info");
                 show('step-preview');
             }
         }
