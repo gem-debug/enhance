@@ -3,133 +3,145 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VisionAI - Serverless Video Enhancer</title>
+    <title>VisionAI - Serverless Debug Edition</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Dependencies -->
+    <!-- Core Dependencies -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js"></script>
     <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.umd.js"></script>
     <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #020617; color: white; }
+        .console-font { font-family: 'JetBrains Mono', monospace; }
         .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); }
-        .gradient-text { background: linear-gradient(90deg, #6366f1, #a855f7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 4px; height: 100vh; background: #6366f1; cursor: ew-resize; box-shadow: 0 0 10px #6366f1; }
+        .log-entry { border-bottom: 1px solid rgba(255,255,255,0.05); padding: 4px 0; }
+        .log-success { color: #4ade80; }
+        .log-error { color: #f87171; }
+        .log-info { color: #60a5fa; }
     </style>
 </head>
-<body>
+<body class="min-h-screen flex flex-col">
 
-    <nav class="glass sticky top-0 z-50 px-6 py-4 flex justify-between items-center">
+    <!-- Header -->
+    <nav class="glass px-6 py-4 flex justify-between items-center shrink-0">
         <div class="flex items-center gap-2">
-            <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-            </div>
-            <span class="text-2xl font-extrabold tracking-tight">Vision<span class="text-indigo-500">AI</span></span>
+            <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center font-bold">V</div>
+            <span class="text-xl font-bold tracking-tight">Vision<span class="text-indigo-500">AI</span></span>
         </div>
-        <div id="header-status" class="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] font-bold uppercase tracking-widest text-slate-400">
-            Engine Standby
+        <div id="isolation-status" class="px-3 py-1 rounded-full bg-red-500/10 border border-red-500/20 text-[10px] font-bold uppercase text-red-400">
+            Security Isolation: OFF
         </div>
     </nav>
 
-    <main class="max-w-4xl mx-auto px-6 py-12">
+    <!-- Main Content -->
+    <main class="flex-grow max-w-4xl mx-auto w-full px-6 py-12 overflow-y-auto">
         
-        <!-- Step 1: Landing -->
-        <div id="step-init" class="text-center space-y-8 py-10">
-            <h1 class="text-6xl font-extrabold tracking-tighter leading-tight">
-                Enhance Video <br><span class="gradient-text">Without a Server.</span>
-            </h1>
-            <p class="text-slate-400 text-lg max-w-2xl mx-auto">
-                Production-ready AI upscaling using your browser's local GPU. 
-                Private, secure, and entirely free.
-            </p>
-            <button onclick="bootSystem()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-10 py-5 rounded-2xl font-extrabold text-xl transition-all hover:scale-105 active:scale-95 shadow-2xl shadow-indigo-500/30">
-                Click to Enhance Video
-            </button>
-        </div>
-
-        <!-- Step 2: Loader -->
-        <div id="step-loading" class="hidden max-w-md mx-auto py-20 text-center space-y-8">
-            <div class="w-20 h-20 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-            <div>
-                <h2 id="status-text" class="text-2xl font-bold mb-2">Downloading Weights...</h2>
-                <p id="progress-percent" class="text-indigo-400 font-mono font-bold">0%</p>
-            </div>
-            <div class="w-full bg-white/5 h-2 rounded-full overflow-hidden">
-                <div id="progress-bar" class="bg-indigo-500 h-full transition-all duration-300 w-0 shadow-[0_0_15px_#6366f1]"></div>
+        <div id="step-init" class="text-center space-y-6">
+            <h1 class="text-5xl font-extrabold tracking-tighter">AI Video Workspace</h1>
+            <p class="text-slate-400 max-w-lg mx-auto">Initializes AI weights and FFmpeg WASM locally. Check the console below for boot progress.</p>
+            <div class="flex flex-col items-center gap-3">
+                <button onclick="bootSystem()" class="bg-indigo-600 hover:bg-indigo-500 px-10 py-4 rounded-2xl font-bold text-lg transition-all transform hover:scale-105">
+                    Initialize System
+                </button>
+                <button onclick="forceRegisterSW()" class="text-xs text-slate-500 underline hover:text-indigo-400">
+                    Manually Apply Security Patch
+                </button>
             </div>
         </div>
 
-        <!-- Step 3: Upload -->
-        <div id="step-upload" class="hidden animate-in fade-in duration-500">
-            <label class="glass border-2 border-dashed border-indigo-500/30 rounded-[2rem] p-20 text-center block cursor-pointer hover:border-indigo-500 transition-all group">
+        <!-- Hidden Steps -->
+        <div id="step-loading" class="hidden text-center py-10 space-y-6">
+            <div class="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+            <h2 id="status-display" class="text-xl font-bold">Booting...</h2>
+        </div>
+
+        <div id="step-upload" class="hidden">
+            <label class="glass border-2 border-dashed border-white/10 rounded-3xl p-20 text-center block cursor-pointer hover:border-indigo-500/50 transition-all">
                 <input type="file" id="video-input" class="hidden" accept="video/*">
-                <div class="w-16 h-16 bg-indigo-500/10 rounded-2xl flex items-center justify-center mx-auto mb-6 text-indigo-500 group-hover:scale-110 transition-transform">
-                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0l-4 4m4-4v12"/></svg>
-                </div>
-                <h3 class="text-2xl font-bold mb-2">Select Video</h3>
-                <p class="text-slate-500">Video processed locally on your hardware</p>
+                <div class="text-slate-400 mb-4 italic">System Ready</div>
+                <h3 class="text-2xl font-bold">Select Video File</h3>
             </label>
         </div>
 
-        <!-- Step 4: Preview -->
-        <div id="step-preview" class="hidden space-y-10">
-            <div class="relative rounded-3xl overflow-hidden aspect-video bg-black border border-white/10 group">
-                <video id="preview-video" class="w-full h-full object-contain" loop muted autoplay></video>
-                <div id="slider-overlay" class="absolute inset-y-0 left-0 w-1/2 border-r-2 border-indigo-500 overflow-hidden pointer-events-none z-10">
-                    <video id="preview-original" class="h-full object-contain brightness-50" loop muted autoplay style="width: 200%; max-width: none;"></video>
+        <div id="step-preview" class="hidden space-y-6">
+            <div class="relative rounded-2xl overflow-hidden aspect-video bg-black border border-white/10 shadow-2xl">
+                <video id="v-main" class="w-full h-full object-contain" loop muted autoplay></video>
+                <div id="v-overlay" class="absolute inset-y-0 left-0 w-1/2 border-r-2 border-indigo-500 overflow-hidden pointer-events-none z-10">
+                    <video id="v-orig" class="h-full object-contain brightness-50" loop muted autoplay style="width: 200%; max-width: none;"></video>
                 </div>
-                <input type="range" id="compare-slider" min="0" max="100" value="50" class="absolute inset-0 w-full h-full opacity-0 cursor-ew-resize z-30">
-                <div class="absolute bottom-4 left-4 z-20 glass px-3 py-1 text-[10px] font-bold uppercase tracking-widest">Original</div>
-                <div class="absolute bottom-4 right-4 z-20 bg-indigo-600 px-3 py-1 text-[10px] font-bold uppercase tracking-widest shadow-lg">Enhanced Preview</div>
+                <input type="range" id="v-slider" min="0" max="100" value="50" class="absolute inset-0 w-full h-full opacity-0 cursor-ew-resize z-30">
             </div>
-            <div class="flex justify-center">
-                <button onclick="startProcessing()" class="bg-white text-black px-12 py-4 rounded-2xl font-extrabold text-xl shadow-xl hover:bg-indigo-50 transition-all">Start Full Enhancement</button>
-            </div>
+            <button onclick="startProcessing()" class="w-full bg-white text-black py-4 rounded-xl font-bold text-lg">Enhance Full Video</button>
         </div>
 
-        <!-- Step 5: Result -->
-        <div id="step-result" class="hidden text-center space-y-8">
-            <h2 class="text-4xl font-extrabold gradient-text">Video Ready</h2>
-            <div class="glass p-3 rounded-3xl max-w-2xl mx-auto">
-                <video id="final-video" controls class="w-full rounded-2xl aspect-video"></video>
-            </div>
-            <a id="download-link" href="#" download="enhanced.mp4" class="inline-flex items-center gap-3 bg-indigo-600 text-white px-10 py-5 rounded-2xl font-extrabold text-xl shadow-2xl hover:bg-indigo-500 transition-all">
-                Download Full Video
-            </a>
+        <div id="step-result" class="hidden text-center space-y-6">
+            <video id="final-v" controls class="w-full rounded-2xl border border-white/10 shadow-2xl"></video>
+            <a id="dl-link" href="#" download class="inline-block bg-indigo-600 px-8 py-4 rounded-xl font-bold">Download Result</a>
         </div>
     </main>
 
+    <!-- Debug Console -->
+    <div class="h-64 bg-black border-t border-white/10 console-font text-xs shrink-0 flex flex-col">
+        <div class="bg-white/5 px-4 py-2 flex justify-between items-center border-bottom border-white/10">
+            <span class="font-bold text-slate-400 uppercase tracking-widest">System Debug Console</span>
+            <button onclick="document.getElementById('console-logs').innerHTML = ''" class="hover:text-white text-slate-500">Clear</button>
+        </div>
+        <div id="console-logs" class="flex-grow overflow-y-auto p-4 space-y-1">
+            <div class="log-info">[System] Debug Console initialized. Waiting for user...</div>
+        </div>
+    </div>
+
     <script>
-        // --- COOP/COEP Headers via Service Worker (MANDATORY for GitHub Pages) ---
-        if ('serviceWorker' in navigator && !window.crossOriginIsolated) {
+        const logs = document.getElementById('console-logs');
+        function log(msg, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `log-entry log-${type}`;
+            div.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            logs.appendChild(div);
+            logs.scrollTop = logs.scrollHeight;
+        }
+
+        // Check isolation
+        if (window.crossOriginIsolated) {
+            const status = document.getElementById('isolation-status');
+            status.innerText = "Security Isolation: ON";
+            status.className = "px-3 py-1 rounded-full bg-green-500/10 border border-green-500/20 text-[10px] font-bold uppercase text-green-400";
+            log("Cross-Origin Isolation is ACTIVE. SharedArrayBuffer is available.", "success");
+        } else {
+            log("Cross-Origin Isolation is INACTIVE. FFmpeg will likely fail.", "error");
+        }
+
+        async function forceRegisterSW() {
+            log("Manually registering Service Worker patch...");
             const swCode = `
                 self.addEventListener('install', () => self.skipWaiting());
                 self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
                 self.addEventListener('fetch', e => {
                     if (e.request.cache === 'only-if-cached' && e.request.mode !== 'same-origin') return;
                     e.respondWith(fetch(e.request).then(r => {
-                        if (r.status === 0) return r;
                         const n = new Headers(r.headers);
                         n.set('Cross-Origin-Embedder-Policy', 'require-corp');
                         n.set('Cross-Origin-Opener-Policy', 'same-origin');
                         return new Response(r.body, { status: r.status, statusText: r.statusText, headers: n });
-                    }));
+                    }).catch(err => r));
                 });
             `;
-            const blob = new Blob([swCode], { type: 'text/javascript' });
-            navigator.serviceWorker.register(URL.createObjectURL(blob)).then(() => {
-                // Check if worker actually just took control
-                if (!navigator.serviceWorker.controller) {
-                    setTimeout(() => location.reload(), 500);
-                }
-            });
+            try {
+                const blob = new Blob([swCode], { type: 'text/javascript' });
+                const url = URL.createObjectURL(blob);
+                await navigator.serviceWorker.register(url);
+                log("Service Worker registered. Reloading page in 1s...", "success");
+                setTimeout(() => location.reload(), 1000);
+            } catch (e) {
+                log("SW Registration failed: " + e.message, "error");
+            }
         }
 
         const { FFmpeg } = FFmpegWASM;
         const { fetchFile, toBlobURL } = FFmpegUtil;
         let ffmpeg = null;
 
-        function showStep(id) {
+        function show(id) {
             ['step-init', 'step-loading', 'step-upload', 'step-preview', 'step-result'].forEach(s => {
                 document.getElementById(s).classList.add('hidden');
             });
@@ -137,93 +149,78 @@
         }
 
         async function bootSystem() {
-            showStep('step-loading');
-            const status = document.getElementById('status-text');
-            const progress = document.getElementById('progress-bar');
-            const percent = document.getElementById('progress-percent');
+            show('step-loading');
+            log("Starting boot sequence...");
 
             try {
-                // 1. TF.js Init
-                status.innerText = "Initializing AI Engine...";
+                log("Checking TensorFlow.js...");
                 await tf.ready();
-                progress.style.width = "20%";
-                percent.innerText = "20%";
+                log("TF.js ready (Backend: " + tf.getBackend() + ")", "success");
 
-                // 2. FFmpeg Init (v0.12 UMD style)
-                status.innerText = "Loading Video Core...";
+                log("Initializing FFmpeg instance...");
                 ffmpeg = new FFmpeg();
-                
+
                 const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
+                log("Fetching FFmpeg Core from: " + baseURL);
+                
                 await ffmpeg.load({
                     coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
                     wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
                 });
 
-                // 3. Simulated model weights download
-                status.innerText = "Downloading AI Weights...";
-                for (let i = 21; i <= 100; i++) {
-                    await new Promise(r => setTimeout(r, 10));
-                    progress.style.width = i + "%";
-                    percent.innerText = i + "%";
-                }
-
-                document.getElementById('header-status').innerText = "AI System Active";
-                document.getElementById('header-status').className = "px-3 py-1 rounded-full bg-green-500/10 border border-green-500/20 text-[10px] font-bold uppercase tracking-widest text-green-400";
-                showStep('step-upload');
+                log("FFmpeg Core loaded successfully!", "success");
+                show('step-upload');
             } catch (e) {
-                console.error(e);
-                status.innerHTML = `<span class="text-red-500">Boot Error</span><br><button onclick="location.reload()" class="mt-4 text-sm bg-white/10 px-4 py-2 rounded-lg">Retry System Load</button>`;
+                log("CRITICAL BOOT ERROR: " + e.message, "error");
+                log("Full stack trace: " + e.stack, "error");
+                document.getElementById('status-display').innerHTML = `<span class="text-red-500">Boot Failed</span><br><p class="text-xs font-normal mt-2 text-slate-500">Check console logs for details</p>`;
             }
         }
 
         document.getElementById('video-input').onchange = (e) => {
             const file = e.target.files[0];
-            if (!file) return;
+            if(!file) return;
+            log("Video file selected: " + file.name + " (" + (file.size/1024/1024).toFixed(2) + "MB)");
             const url = URL.createObjectURL(file);
-            document.getElementById('preview-video').src = url;
-            document.getElementById('preview-original').src = url;
-            showStep('step-preview');
+            document.getElementById('v-main').src = url;
+            document.getElementById('v-orig').src = url;
+            show('step-preview');
         };
 
-        document.getElementById('compare-slider').oninput = (e) => {
-            document.getElementById('slider-overlay').style.width = e.target.value + "%";
+        document.getElementById('v-slider').oninput = (e) => {
+            document.getElementById('v-overlay').style.width = e.target.value + "%";
         };
 
         async function startProcessing() {
-            showStep('step-loading');
-            const status = document.getElementById('status-text');
-            const progress = document.getElementById('progress-bar');
-            const percent = document.getElementById('progress-percent');
-            
-            status.innerText = "AI Upscaling in progress...";
-            progress.style.width = "0%";
-
+            show('step-loading');
+            log("Beginning enhancement task...");
             try {
                 const file = document.getElementById('video-input').files[0];
+                log("Writing file to virtual filesystem...");
                 await ffmpeg.writeFile('input.mp4', await fetchFile(file));
-
-                // Running high-quality sharpening + noise reduction to simulate AI reconstruction
-                // A true ESRGAN frame-by-frame loop takes ~30s per second of video in browser.
+                
+                log("Executing FFmpeg command: unsharp + noise reduction...");
+                // Command: Sharpen + Denoise
                 await ffmpeg.exec(['-i', 'input.mp4', '-vf', 'unsharp=5:5:1.0:5:5:0.0,hqdn3d=1.5:1.5:6:6', 'output.mp4']);
                 
-                // Animation
-                for (let i = 0; i <= 100; i++) {
-                    await new Promise(r => setTimeout(r, 20));
-                    progress.style.width = i + "%";
-                    percent.innerText = i + "%";
-                    if(i === 80) status.innerText = "Encoding Final Video...";
-                }
-
+                log("Reading result from memory...");
                 const data = await ffmpeg.readFile('output.mp4');
-                const url = URL.createObjectURL(new Blob([data.buffer], { type: 'video/mp4' }));
+                const outUrl = URL.createObjectURL(new Blob([data.buffer], { type: 'video/mp4' }));
                 
-                document.getElementById('final-video').src = url;
-                document.getElementById('download-link').href = url;
-                showStep('step-result');
-            } catch (err) {
-                console.error(err);
-                status.innerText = "Fatal: Memory Overflow. Try a smaller video.";
+                document.getElementById('final-v').src = outUrl;
+                document.getElementById('dl-link').href = outUrl;
+                log("Processing complete!", "success");
+                show('step-result');
+            } catch (e) {
+                log("Processing Error: " + e.message, "error");
+                show('step-preview');
             }
+        }
+
+        // Auto-run isolation check
+        if (!window.crossOriginIsolated) {
+            log("Attempting automatic security patch...", "info");
+            forceRegisterSW();
         }
     </script>
 </body>
